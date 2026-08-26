@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="JsonRpcKit/JsonRpcKit.csproj" />
+  <Project Path="JsonRpcKit.OpenRpc/JsonRpcKit.OpenRpc.csproj" />
+  <Project Path="JsonRpcKit.Reference/JsonRpcKit.Reference.csproj" />
+  <Project Path="tests/JsonRpcKit.Tests/JsonRpcKit.Tests.csproj" />
+</Solution>

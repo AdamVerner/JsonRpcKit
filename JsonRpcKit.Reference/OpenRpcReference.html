@@ -1,0 +1,1392 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__TITLE__</title>
+    <style>
+      /* Prose is set in sans; every label, identifier and measurement is set in mono. On an API
+         reference nearly every label is an identifier, so the split does real work: if it is in
+         mono you can type it at the server. */
+      :root {
+        color-scheme: light dark;
+        --bg: #fcfcfd;
+        --panel: #f4f5f8;
+        --sunk: #eef0f4;
+        --ink: #10141a;
+        --muted: #5c6675;
+        --rule: #e3e6ec;
+        --rule-soft: #edeff3;
+        --accent: #0a6cd6;
+        --accent-soft: #e8f1fd;
+        --live: #0f9d63;
+        --warn: #b45309;
+        --warn-soft: #fdf3e2;
+        --danger: #c8322e;
+
+        --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI",
+          Roboto, sans-serif;
+        --mono: ui-monospace, "SF Mono", "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas,
+          monospace;
+
+        --sidebar: 292px;
+        --measure: 58rem;
+        /* Tables want the full column; prose does not — 68ch is where a line stops being
+           comfortable to track back from. */
+        --prose: 42rem;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0c0f13;
+          --panel: #12161c;
+          --sunk: #171c23;
+          --ink: #e8ebf1;
+          --muted: #949eae;
+          --rule: #212832;
+          --rule-soft: #1a2029;
+          --accent: #58aaff;
+          --accent-soft: #12233a;
+          --live: #34d399;
+          --warn: #f0b357;
+          --warn-soft: #2c2413;
+          --danger: #f87171;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; }
+        * { transition: none !important; animation: none !important; }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 15px;
+        line-height: 1.62;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+      p { margin: 0 0 0.9em; }
+      p:last-child { margin-bottom: 0; }
+      ul { margin: 0 0 0.9em; padding-left: 1.2em; }
+      code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+      /* An uppercase mono micro-label. Used for anything that names a structure rather than
+         saying something: section eyebrows, table headers, group titles. */
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      /* ---- frame ------------------------------------------------------------------- */
+      #layout { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); }
+      aside {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--rule);
+        background: var(--panel);
+      }
+      .aside-head { padding: 22px 20px 14px; border-bottom: 1px solid var(--rule); }
+      .aside-head h1 { font-size: 15px; margin: 0; letter-spacing: -0.01em; }
+      .aside-head .version {
+        margin-top: 3px;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .filter-wrap { position: relative; margin-top: 14px; }
+      #filter {
+        width: 100%;
+        padding: 7px 34px 7px 11px;
+        border: 1px solid var(--rule);
+        border-radius: 7px;
+        background: var(--bg);
+        color: inherit;
+        font-family: var(--mono);
+        font-size: 12.5px;
+      }
+      #filter::placeholder { color: var(--muted); }
+      .filter-wrap kbd {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 1px 6px;
+        border: 1px solid var(--rule);
+        border-radius: 4px;
+        background: var(--panel);
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--muted);
+        pointer-events: none;
+      }
+      nav { flex: 1 1 auto; overflow-y: auto; padding: 14px 12px 24px; }
+      nav .group { margin-bottom: 4px; }
+      nav .group > .head {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        width: 100%;
+        padding: 6px 8px;
+        border: 0;
+        border-radius: 6px;
+        background: none;
+        color: var(--ink);
+        cursor: pointer;
+        text-align: left;
+      }
+      nav .group > .head:hover { background: var(--sunk); }
+      nav .group > .head .label {
+        font-family: var(--mono);
+        font-size: 11.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      nav .group > .head .chev {
+        color: var(--muted);
+        font-size: 9px;
+        transition: transform 0.15s ease;
+      }
+      nav .group.collapsed > .head .chev { transform: rotate(-90deg); }
+      nav .group.collapsed > .items { display: none; }
+      nav .group > .head .count {
+        margin-left: auto;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        color: var(--muted);
+      }
+      nav .items { padding: 2px 0 6px 8px; margin-left: 9px; border-left: 1px solid var(--rule); }
+      nav a.item {
+        display: flex;
+        align-items: baseline;
+        padding: 3px 8px;
+        border-radius: 5px;
+        color: var(--muted);
+        text-decoration: none;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      nav a.item:hover { background: var(--sunk); color: var(--ink); }
+      nav a.item.active { background: var(--accent-soft); color: var(--accent); }
+      nav a.item .mname { min-width: 0; overflow-wrap: anywhere; }
+      nav a.item .mark { margin-left: auto; padding-left: 6px; font-size: 10px; }
+      aside footer {
+        padding: 12px 20px 16px;
+        border-top: 1px solid var(--rule);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        font-size: 12.5px;
+      }
+
+      main { min-width: 0; padding: 40px 48px 96px; }
+      .wrap { max-width: var(--measure); }
+
+      /* ---- page header ------------------------------------------------------------- */
+      .page-head h1 { font-size: 30px; line-height: 1.2; margin: 0 0 14px; letter-spacing: -0.02em; }
+      .page-head .lede { color: var(--muted); max-width: var(--prose); }
+      .page-head .lede code { color: var(--ink); }
+
+      /* The thesis of this API, and the one thing that makes it unlike a REST reference: it is a
+         single ordered session, not a set of independent calls. Stated once, at the top. */
+      .lifecycle {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1px;
+        margin: 26px 0 8px;
+        border: 1px solid var(--rule);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--rule);
+      }
+      .lifecycle .step { background: var(--bg); padding: 13px 15px 15px; }
+      .lifecycle .step .when {
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .lifecycle .step .what { margin-top: 4px; font-size: 13.5px; font-weight: 600; }
+      .lifecycle .step .how {
+        margin-top: 3px;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      .lifecycle .step .how a { color: inherit; text-decoration: none; border-bottom: 1px dotted; }
+      .lifecycle .step .how a:hover { color: var(--accent); }
+
+      .endpoint {
+        margin-top: 22px;
+        padding: 14px 16px;
+        border: 1px solid var(--rule);
+        border-radius: 10px;
+        background: var(--panel);
+      }
+      .endpoint .row { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+      .endpoint .url { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+      .endpoint .note { color: var(--muted); font-size: 13px; }
+
+      /* ---- category ---------------------------------------------------------------- */
+      section.category { padding-top: 56px; scroll-margin-top: 8px; }
+      .category > .head { border-top: 2px solid var(--ink); padding-top: 14px; }
+      .category > .head h2 {
+        margin: 6px 0 10px;
+        font-size: 22px;
+        letter-spacing: -0.015em;
+      }
+      .category > .head .blurb { color: var(--muted); max-width: var(--prose); }
+
+      /* The summary table the user meets before the calls themselves. */
+      .index { margin: 20px 0 4px; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+      .index a.row {
+        display: grid;
+        grid-template-columns: minmax(0, 19rem) minmax(0, 1fr);
+        gap: 4px 20px;
+        padding: 10px 15px;
+        border-top: 1px solid var(--rule-soft);
+        color: inherit;
+        text-decoration: none;
+      }
+      .index a.row:first-child { border-top: 0; }
+      .index a.row:hover { background: var(--panel); }
+      .index a.row .name { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+      .index a.row .said { color: var(--muted); font-size: 13.5px; }
+      @media (max-width: 780px) {
+        .index a.row { grid-template-columns: 1fr; }
+      }
+
+      /* ---- method ------------------------------------------------------------------ */
+      section.method {
+        padding: 34px 0 6px;
+        border-top: 1px solid var(--rule);
+        scroll-margin-top: 8px;
+      }
+      .method .title-row { display: flex; align-items: flex-start; gap: 12px; }
+      .method h3 {
+        flex: 1 1 auto;
+        margin: 0 0 8px;
+        font-family: var(--mono);
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        overflow-wrap: anywhere;
+      }
+      /* A method name is read as namespace + verb. The namespace repeats down the page and the
+         verb is what distinguishes one call from the next, so only the verb is set in ink. */
+      .ns { color: var(--muted); font-weight: 400; }
+      .method .summary { font-size: 15.5px; max-width: var(--prose); margin-bottom: 0.9em; }
+      .badge {
+        display: inline-block;
+        padding: 1.5px 8px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        white-space: nowrap;
+      }
+      .badge.push { color: var(--muted); }
+
+      .field { margin-top: 24px; }
+      .field > .eyebrow { display: block; margin-bottom: 8px; }
+      /* Fixed so every params/result table on the page shares one column grid — ragged column
+         edges between adjacent methods read as disorder. */
+      table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      col.c-name { width: 21%; }
+      col.c-type { width: 26%; }
+      /* An error code is six characters wide however much room it is given. */
+      col.c-code { width: 11%; }
+      col.c-err { width: 20%; }
+      .category > table { margin-top: 22px; }
+      th {
+        text-align: left;
+        font-family: var(--mono);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        padding: 0 12px 6px 0;
+        border-bottom: 1px solid var(--rule);
+      }
+      td { padding: 9px 12px 9px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+      td:last-child, th:last-child { padding-right: 0; }
+      td.name { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+      td.type {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+      td.desc { font-size: 13.5px; color: var(--muted); }
+      td.desc code { color: var(--ink); }
+      .req {
+        display: inline-block;
+        margin-left: 7px;
+        font-family: var(--mono);
+        font-size: 9.5px;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--warn);
+      }
+      /* Three levels of nesting inside a table cell eventually runs out of room to break in.
+         Scrolls inside its own box rather than dragging the page sideways. */
+      .nested {
+        margin: 8px 0 2px;
+        padding-left: 14px;
+        border-left: 2px solid var(--rule);
+        overflow-x: auto;
+      }
+      .nested td { font-size: 12.5px; }
+      .nested table { table-layout: auto; }
+      .variant { margin-top: 8px; }
+      .variant > .label { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+      .scalar { font-family: var(--mono); font-size: 13px; }
+      .empty { color: var(--muted); font-style: italic; font-size: 13.5px; }
+
+      pre {
+        margin: 0;
+        padding: 12px 14px;
+        border: 1px solid var(--rule);
+        border-radius: 8px;
+        background: var(--sunk);
+        overflow-x: auto;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.55;
+      }
+      p code, .said code, li code {
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: var(--sunk);
+        font-size: 0.87em;
+      }
+      details { margin-top: 18px; }
+      details > summary {
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      details[open] > summary { margin-bottom: 10px; }
+
+      .callout {
+        --mark: var(--warn);
+        margin: 14px 0 6px;
+        max-width: var(--prose);
+        padding: 12px 16px;
+        border: 1px solid var(--mark);
+        border-left-width: 4px;
+        border-radius: 0 8px 8px 0;
+        background: var(--warn-soft);
+        background: color-mix(in srgb, var(--mark) 9%, var(--bg));
+      }
+      .callout .headline { font-weight: 650; font-size: 14px; }
+      .callout p { margin: 6px 0 0; font-size: 13.5px; }
+      .callout .scope {
+        margin-top: 8px;
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        opacity: 0.8;
+      }
+      .notice { margin: 22px 0 0; max-width: var(--prose); }
+      /* Where the whole-surface warning has already been given, a method only says what is true
+         of it alone. */
+      .callout.terse { padding: 9px 14px; }
+      .callout.terse p { margin: 0; }
+
+      button {
+        font: inherit;
+        font-family: var(--mono);
+        font-size: 12px;
+        padding: 5px 12px;
+        border: 1px solid var(--rule);
+        border-radius: 7px;
+        background: var(--bg);
+        color: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:hover { border-color: var(--accent); color: var(--accent); }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      button.primary:hover { color: #fff; filter: brightness(1.08); }
+      button[disabled] { opacity: 0.45; cursor: default; }
+      button[disabled]:hover { border-color: var(--rule); color: inherit; }
+
+      /* ---- console ----------------------------------------------------------------- */
+      /* Docked, and visible even when collapsed: the ribbon in its bar is the page's running
+         statement of where a session has got to. */
+      #console {
+        position: fixed;
+        left: var(--sidebar);
+        right: 0;
+        bottom: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        max-height: 56vh;
+        border-top: 1px solid var(--rule);
+        background: var(--panel);
+        box-shadow: 0 -8px 24px rgb(0 0 0 / 0.09);
+      }
+      #console.collapsed .console-body { display: none; }
+      .console-bar { display: flex; gap: 10px; align-items: center; padding: 9px 16px; flex-wrap: wrap; }
+
+      /* The connection as four lit segments. Only meaningful because it is wired to the real
+         socket: grey until something actually happens. */
+      .ribbon { display: flex; align-items: center; gap: 8px; }
+      .ribbon .segs { display: flex; gap: 3px; }
+      .ribbon .seg {
+        width: 22px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--rule);
+        transition: background 0.25s ease;
+      }
+      .ribbon.at-1 .seg:nth-child(-n + 1),
+      .ribbon.at-2 .seg:nth-child(-n + 2),
+      .ribbon.at-3 .seg:nth-child(-n + 3),
+      .ribbon.at-4 .seg:nth-child(-n + 4) { background: var(--live); }
+      .ribbon.err .seg { background: var(--danger); }
+      .ribbon .state {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+        min-width: 8.5em;
+      }
+      .ribbon.at-1 .state, .ribbon.at-2 .state, .ribbon.at-3 .state, .ribbon.at-4 .state {
+        color: var(--live);
+      }
+      .ribbon.err .state { color: var(--danger); }
+
+      .console-bar input {
+        flex: 1 1 190px;
+        min-width: 130px;
+        padding: 5px 10px;
+        border: 1px solid var(--rule);
+        border-radius: 7px;
+        background: var(--bg);
+        color: inherit;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      .console-body { display: flex; flex-direction: column; min-height: 0; }
+      .call-row { display: flex; gap: 8px; align-items: center; padding: 0 16px 8px; flex-wrap: wrap; }
+      .call-row select {
+        flex: 0 1 280px;
+        padding: 5px 9px;
+        border: 1px solid var(--rule);
+        border-radius: 7px;
+        background: var(--bg);
+        color: inherit;
+        font-family: var(--mono);
+        font-size: 12px;
+      }
+      #params {
+        margin: 0 16px 10px;
+        min-height: 66px;
+        max-height: 26vh;
+        resize: vertical;
+        padding: 9px 11px;
+        border: 1px solid var(--rule);
+        border-radius: 8px;
+        background: var(--bg);
+        color: inherit;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      #log { flex: 1 1 auto; overflow-y: auto; padding: 0 16px 14px; }
+      #log .entry { padding: 7px 0; border-top: 1px dashed var(--rule); }
+      #log .entry:first-child { border-top: 0; }
+      #log .head {
+        font-family: var(--mono);
+        font-size: 11px;
+        letter-spacing: 0.03em;
+        color: var(--muted);
+      }
+      #log .out .head { color: var(--accent); }
+      #log .err .head { color: var(--danger); }
+      #log .push .head { color: var(--warn); }
+      #log .in .head { color: var(--live); }
+      #log pre { margin-top: 5px; padding: 8px 10px; font-size: 11.5px; }
+      body.console-open main { padding-bottom: 60vh; }
+      body:not(.console-open) main { padding-bottom: 140px; }
+
+      #loading, #load-error, #no-match { padding: 60px 0; color: var(--muted); }
+      #no-match { display: none; }
+      body.filtered-empty #no-match { display: block; }
+      #load-error strong { color: var(--danger); }
+
+      @media (max-width: 900px) {
+        :root { --sidebar: 0px; }
+        #layout { grid-template-columns: 1fr; }
+        aside {
+          position: static;
+          height: auto;
+          border-right: 0;
+          border-bottom: 1px solid var(--rule);
+        }
+        nav { max-height: 320px; }
+        main { padding: 28px 22px 96px; }
+        #console { left: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="layout">
+      <aside>
+        <div class="aside-head">
+          <h1 id="side-title">__TITLE__</h1>
+          <div class="version" id="side-version">loading…</div>
+          <div class="filter-wrap">
+            <input id="filter" type="search" placeholder="Filter methods" autocomplete="off" spellcheck="false" />
+            <kbd>/</kbd>
+          </div>
+        </div>
+        <nav id="nav"></nav>
+        <footer id="links"></footer>
+      </aside>
+
+      <main>
+        <div class="wrap" id="main">
+          <p id="loading" class="empty">Loading the OpenRPC document…</p>
+        </div>
+        <p id="no-match" class="empty wrap">No method matches that filter.</p>
+      </main>
+    </div>
+
+    <!-- Talks to the real socket on this host. Nothing is stored: the token lives in the field
+         until the page is closed. -->
+    <div id="console" class="collapsed">
+      <div class="console-bar">
+        <button id="toggle" aria-expanded="false">Console ▲</button>
+        <span class="ribbon" id="ribbon" title="Connection lifecycle">
+          <span class="segs">
+            <i class="seg"></i><i class="seg"></i><i class="seg"></i><i class="seg"></i>
+          </span>
+          <span class="state" id="state">disconnected</span>
+        </span>
+        <input id="ws-url" spellcheck="false" aria-label="WebSocket URL" />
+        <input id="token" type="password" placeholder="access token" aria-label="Access token" />
+        <button id="connect" class="primary">Connect</button>
+        <button id="disconnect" disabled>Disconnect</button>
+      </div>
+      <div class="console-body">
+        <div class="call-row">
+          <select id="call-method" aria-label="Method"></select>
+          <button id="send" class="primary">Send</button>
+          <button id="reset">Reset params</button>
+          <button id="clear">Clear log</button>
+        </div>
+        <textarea id="params" spellcheck="false" aria-label="Params JSON">{}</textarea>
+        <div id="log"></div>
+      </div>
+    </div>
+
+    <script>
+      'use strict';
+
+      const DOCUMENT_URL = __DOCUMENT_URL__;
+      // Which method extension carries the warning mark. The vocabulary inside it is the
+      // application's; this page only lays out whichever of its fields are present.
+      const MARK = __MARK_EXTENSION__;
+      const LINKS = __LINKS__;
+
+      const el = (id) => document.getElementById(id);
+      const methodsByName = new Map();
+
+      const escapeHtml = (value) =>
+        String(value).replace(
+          /[&<>"']/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c],
+        );
+
+      // Enough markdown for what a document carries: paragraphs, "- " lists, `code` and links.
+      function prose(text) {
+        if (!text) return '';
+        const inline = (s) =>
+          escapeHtml(s)
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>');
+        return String(text)
+          .split(/\n\s*\n/)
+          .map((block) => {
+            const lines = block.split('\n').map((line) => line.trim());
+            if (lines.every((line) => line.startsWith('- ')))
+              return `<ul>${lines.map((l) => `<li>${inline(l.slice(2))}</li>`).join('')}</ul>`;
+            return `<p>${inline(lines.join(' '))}</p>`;
+          })
+          .join('');
+      }
+
+      // A method name reads as namespace + verb: the namespace repeats down the page, the verb is
+      // what tells one call from the next.
+      function methodName(name) {
+        const cut = name.lastIndexOf('.');
+        if (cut < 0) {
+          const slash = name.lastIndexOf('/');
+          return slash < 0
+            ? `<span class="verb">${escapeHtml(name)}</span>`
+            : `<span class="ns">${escapeHtml(name.slice(0, slash + 1))}</span><span class="verb">${escapeHtml(
+                name.slice(slash + 1),
+              )}</span>`;
+        }
+        return `<span class="ns">${escapeHtml(name.slice(0, cut + 1))}</span><span class="verb">${escapeHtml(
+          name.slice(cut + 1),
+        )}</span>`;
+      }
+
+      // ---- schema rendering ----------------------------------------------------------
+
+      // A short type for the table cell. The generator writes big integers as ["string","integer"]
+      // with a pattern, because ids outside the double-precision range have to survive as strings.
+      function typeLabel(schema) {
+        if (!schema || typeof schema !== 'object') return 'any';
+        if (schema.const !== undefined) return JSON.stringify(schema.const);
+        if (schema.enum) return schema.enum.map((v) => JSON.stringify(v)).join(' | ');
+        const variants = schema.anyOf || schema.oneOf;
+        if (variants) {
+          const cases = variants.map(discriminator);
+          return cases.every(Boolean) ? cases.join(' | ') : variants.map(typeLabel).join(' | ');
+        }
+        let types = schema.type;
+        if (Array.isArray(types)) {
+          const nullable = types.includes('null');
+          const rest = types.filter((t) => t !== 'null');
+          const label =
+            rest.includes('integer') && rest.includes('string') ? 'integer' : rest.join(' | ');
+          return nullable ? `${label}?` : label;
+        }
+        if (types === 'array') return `${typeLabel(schema.items)}[]`;
+        return types || (schema.properties ? 'object' : 'any');
+      }
+
+      // A union keyed on a constant property ("kind": "user") reads as its cases, not as
+      // "object | object | object".
+      function discriminator(schema) {
+        const constant = Object.values((schema && schema.properties) || {}).find(
+          (property) => property && property.const !== undefined,
+        );
+        return constant ? JSON.stringify(constant.const) : null;
+      }
+
+      function propertyRows(schema, depth) {
+        const required = new Set(schema.required || []);
+        return Object.entries(schema.properties || {})
+          .map(([name, property]) => {
+            const nested = depth < 4 ? childTable(property, depth + 1) : '';
+            return `<tr>
+              <td class="name">${escapeHtml(name)}${
+                required.has(name) ? '<span class="req">req</span>' : ''
+              }</td>
+              <td class="type">${escapeHtml(typeLabel(property))}</td>
+              <td class="desc">${prose(property.description)}${nested}</td>
+            </tr>`;
+          })
+          .join('');
+      }
+
+      // Objects nested inside a property, and the variants of a discriminated union, are rendered
+      // inline rather than behind a $ref the reader would have to go and find.
+      function childTable(schema, depth) {
+        if (!schema || typeof schema !== 'object') return '';
+        const variants = schema.anyOf || schema.oneOf;
+        if (variants)
+          return `<div class="nested">${variants
+            .map((variant) => {
+              const label = discriminator(variant) || typeLabel(variant);
+              return `<div class="variant"><div class="label">${escapeHtml(label)}</div>${
+                childTable(variant, depth) || ''
+              }</div>`;
+            })
+            .join('')}</div>`;
+
+        const target = schema.type === 'array' ? schema.items : schema;
+        if (!target || !target.properties) return '';
+        return `<div class="nested"><table><tbody>${propertyRows(target, depth)}</tbody></table></div>`;
+      }
+
+      function paramsTable(params, label) {
+        if (!params || params.length === 0) return `<p class="empty">Takes no ${label}.</p>`;
+        const rows = params
+          .map(
+            (param) => `<tr>
+              <td class="name">${escapeHtml(param.name)}${
+                param.required ? '<span class="req">req</span>' : ''
+              }</td>
+              <td class="type">${escapeHtml(typeLabel(param.schema))}</td>
+              <td class="desc">${prose(
+                param.description || (param.schema || {}).description,
+              )}${childTable(param.schema, 1)}</td>
+            </tr>`,
+          )
+          .join('');
+        return `<table><colgroup><col class="c-name" /><col class="c-type" /><col /></colgroup><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+
+      function resultBlock(result) {
+        if (!result)
+          return `<div class="field"><span class="eyebrow">Result</span><p class="empty">Answers with no value.</p></div>`;
+        const schema = result.schema || {};
+        const body = schema.properties
+          ? `<table><colgroup><col class="c-name" /><col class="c-type" /><col /></colgroup><thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead><tbody>${propertyRows(
+              schema,
+              1,
+            )}</tbody></table>`
+          : `<p class="scalar">${escapeHtml(typeLabel(schema))}</p>${childTable(schema, 1)}`;
+        return `<div class="field"><span class="eyebrow">Result</span>${prose(
+          schema.description,
+        )}${body}</div>`;
+      }
+
+      // The whole warning travels in the document as data, so the page lays it out rather than
+      // parsing a markdown banner out of a description.
+      // Grouping ignores `note`: the note is the one part that is meant to differ per method, so
+      // keying on it would split a method with a note out of the group whose warning it shares and
+      // make it repeat that shared warning in full.
+      const stabilityKey = (stability) =>
+        stability
+          ? [stability.headline, stability.body].map((p) => p || '').join('\u0000')
+          : null;
+
+      // A warning repeated on nearly every method describes the API, not the method. Said once at
+      // the top, it is read; said eleven times it is scrolled past, taking each method's own note
+      // with it.
+      function hoistedStability(methods) {
+        const counts = new Map();
+        for (const method of methods) {
+          const key = stabilityKey(method[MARK]);
+          if (key) counts.set(key, (counts.get(key) || 0) + 1);
+        }
+        let top = null;
+        for (const [key, count] of counts) if (!top || count > top.count) top = { key, count };
+        if (!top || top.count < 3 || top.count * 2 <= methods.length) return null;
+
+        const sample = methods.find((m) => stabilityKey(m[MARK]) === top.key);
+        return { ...top, stability: sample[MARK], total: methods.length };
+      }
+
+      function stabilityCallout(stability, hoisted) {
+        if (!stability) return '';
+        const colour = escapeHtml(stability.color || 'currentColor');
+        if (hoisted && stabilityKey(stability) === hoisted.key)
+          return stability.note
+            ? `<div class="callout terse" style="--mark:${colour}"><p>${escapeHtml(
+                stability.note,
+              )}</p></div>`
+            : '';
+        return `<div class="callout" style="--mark:${colour}">
+          <div class="headline">${escapeHtml(stability.headline || '')}</div>
+          ${stability.body ? `<p>${escapeHtml(stability.body)}</p>` : ''}
+          ${stability.note ? `<p>${escapeHtml(stability.note)}</p>` : ''}
+        </div>`;
+      }
+
+      function noticeBlock(hoisted) {
+        if (!hoisted) return '';
+        const s = hoisted.stability;
+        return `<div class="notice"><div class="callout" style="--mark:${escapeHtml(
+          s.color || 'currentColor',
+        )}">
+          <div class="headline">${escapeHtml(s.headline || '')}</div>
+          ${s.body ? `<p>${escapeHtml(s.body)}</p>` : ''}
+          <div class="scope">Applies to ${hoisted.count} of ${hoisted.total} methods${
+            hoisted.count === hoisted.total ? '' : ', marked ' + escapeHtml(s.marker || '')
+          }. A call with more to say says it beside its own name.</div>
+        </div></div>`;
+      }
+
+      function stabilityBadge(stability) {
+        if (!stability || !stability.badge) return '';
+        const colour = escapeHtml(stability.color || 'currentColor');
+        return `<span class="badge" style="color:${colour}">${escapeHtml(stability.badge)}</span>`;
+      }
+
+      function renderMethod(method, isNotification, hoisted) {
+        const stability = method[MARK];
+        const description =
+          method.description && method.description !== method.summary ? method.description : '';
+        return `<section class="method" id="${escapeHtml(method.name)}">
+          <div class="title-row">
+            <h3>${methodName(method.name)}</h3>
+            ${stabilityBadge(stability)}
+            ${
+              isNotification
+                ? '<span class="badge push">SERVER → CLIENT</span>'
+                : `<button class="try" data-method="${escapeHtml(method.name)}">Try it</button>`
+            }
+          </div>
+          ${stabilityCallout(stability, hoisted)}
+          <div class="summary">${prose(method.summary)}</div>
+          ${prose(description)}
+          <div class="field">
+            <span class="eyebrow">${isNotification ? 'Payload' : 'Params'}</span>
+            ${paramsTable(method.params, isNotification ? 'payload' : 'params')}
+          </div>
+          ${isNotification ? '' : resultBlock(method.result)}
+          <details>
+            <summary>OpenRPC entry</summary>
+            <pre>${escapeHtml(JSON.stringify(method, null, 2))}</pre>
+          </details>
+        </section>`;
+      }
+
+      // ---- categories ----------------------------------------------------------------
+
+      const NOTIFICATION_TAG = 'x-notifications';
+
+      // Tag catalogue + order come from the document; without them the page still works, it just
+      // groups by the tag names the methods carry and sorts them as they appear.
+      function categorize(doc) {
+        const catalogue = ((doc.components || {}).tags) || {};
+        const order = doc['x-tag-order'] || [];
+        const tagOf = (method) => {
+          const first = (method.tags || [])[0];
+          if (!first) return null;
+          if (first.$ref) return String(first.$ref).split('/').pop();
+          return first.name || null;
+        };
+
+        const groups = new Map();
+        const take = (name) => {
+          if (!groups.has(name)) {
+            const tag = catalogue[name] || {};
+            groups.set(name, {
+              name,
+              title: tag['x-displayName'] || name,
+              description: tag.description || '',
+              methods: [],
+            });
+          }
+          return groups.get(name);
+        };
+
+        for (const name of order) if (catalogue[name]) take(name);
+        for (const method of doc.methods || []) take(tagOf(method) || 'other').methods.push(method);
+
+        const notifications = doc[NOTIFICATION_TAG] || [];
+        const ordered = [...groups.values()].filter((g) => g.methods.length);
+        if (notifications.length)
+          ordered.push({
+            name: NOTIFICATION_TAG,
+            title: 'Server events',
+            description:
+              'Messages the server pushes on its own, with no request to answer. OpenRPC describes '
+              + 'only what a client may call, so these are published under the document’s '
+              + '`x-notifications` extension.',
+            methods: notifications,
+            isNotifications: true,
+          });
+        return ordered;
+      }
+
+      function renderCategory(group, hoisted) {
+        // A one-method category needs no index: the row would say exactly what the heading
+        // three lines below it already says.
+        const index =
+          group.methods.length < 2
+            ? ''
+            : `<div class="index">${group.methods
+                .map(
+                  (method) => `<a class="row" href="#${escapeHtml(method.name)}">
+                    <span class="name">${methodName(method.name)}</span>
+                    <span class="said">${escapeHtml(method.summary || '')}</span>
+                  </a>`,
+                )
+                .join('')}</div>`;
+
+        return `<section class="category" id="tag-${escapeHtml(group.name)}">
+          <div class="head">
+            <span class="eyebrow">${group.isNotifications ? 'Pushed' : 'Category'}</span>
+            <h2>${escapeHtml(group.title)}</h2>
+            <div class="blurb">${prose(group.description)}</div>
+          </div>
+          ${index}
+          ${group.methods.map((m) => renderMethod(m, !!group.isNotifications, hoisted)).join('')}
+        </section>`;
+      }
+
+      function renderErrors(doc) {
+        const errors = ((doc.components || {}).errors) || {};
+        const rows = Object.entries(errors)
+          .sort((a, b) => a[1].code - b[1].code)
+          .map(
+            ([name, error]) => `<tr>
+              <td class="type">${escapeHtml(error.code)}</td>
+              <td class="name">${escapeHtml(name)}</td>
+              <td class="desc">${escapeHtml(error.message || '')}</td>
+            </tr>`,
+          )
+          .join('');
+        if (!rows) return '';
+        return `<section class="category" id="tag-errors">
+          <div class="head">
+            <span class="eyebrow">Reference</span>
+            <h2>Error codes</h2>
+            <div class="blurb"><p>A failed call answers with a JSON-RPC <code>error</code> object
+              carrying one of these codes. Codes below <code>-32000</code> are JSON-RPC’s own.</p></div>
+          </div>
+          <table><colgroup><col class="c-code" /><col class="c-err" /><col /></colgroup><thead><tr><th>Code</th><th>Name</th><th>Means</th></tr></thead><tbody>${rows}</tbody></table>
+        </section>`;
+      }
+
+      // ---- navigation -----------------------------------------------------------------
+
+      function renderNav(groups) {
+        el('nav').innerHTML = groups
+          .map(
+            (group) => `<div class="group" data-group="${escapeHtml(group.name)}">
+              <button class="head" type="button">
+                <span class="chev">▼</span>
+                <span class="label">${escapeHtml(group.title)}</span>
+                <span class="count">${group.methods.length}</span>
+              </button>
+              <div class="items">
+                ${group.methods
+                  .map((method) => {
+                    const stability = method[MARK];
+                    return `<a class="item" href="#${escapeHtml(method.name)}"><span class="mname">${methodName(
+                      method.name,
+                    )}</span>${
+                      stability ? `<span class="mark">${escapeHtml(stability.marker || '')}</span>` : ''
+                    }</a>`;
+                  })
+                  .join('')}
+              </div>
+            </div>`,
+          )
+          .join('');
+
+        for (const head of document.querySelectorAll('nav .group > .head'))
+          head.addEventListener('click', () => head.parentElement.classList.toggle('collapsed'));
+
+        // Narrow screens stack the sidebar above the content, so an expanded nav is a screenful of
+        // scrolling before the reader reaches what they came for.
+        if (matchMedia('(max-width: 900px)').matches)
+          for (const group of document.querySelectorAll('nav .group'))
+            group.classList.add('collapsed');
+      }
+
+      // Scrolls the sidebar and nothing else. scrollIntoView would walk every scrollable ancestor,
+      // the page included, and yank the reader back the moment a deep link landed.
+      function revealInNav(link) {
+        const pane = el('nav');
+        const item = link.getBoundingClientRect();
+        const box = pane.getBoundingClientRect();
+        if (item.top < box.top) pane.scrollTop -= box.top - item.top + 24;
+        else if (item.bottom > box.bottom) pane.scrollTop += item.bottom - box.bottom + 24;
+      }
+
+      // Highlights the method currently under the reader, and keeps it in view in the sidebar.
+      function trackScroll() {
+        const links = new Map();
+        for (const link of document.querySelectorAll('nav a.item'))
+          links.set(decodeURIComponent(link.getAttribute('href').slice(1)), link);
+
+        const sections = [...document.querySelectorAll('section.method')];
+        const visible = new Set();
+        let active = null;
+
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries)
+              if (entry.isIntersecting) visible.add(entry.target.id);
+              else visible.delete(entry.target.id);
+
+            // The topmost section in the band, not whichever entry the callback happened to
+            // report last — a jump crosses several at once and the last one is arbitrary.
+            const first = sections.find((section) => visible.has(section.id));
+            const link = first && links.get(first.id);
+            if (!link || link === active) return;
+            if (active) active.classList.remove('active');
+            link.classList.add('active');
+            revealInNav(link);
+            active = link;
+          },
+          { rootMargin: '-10% 0px -70% 0px' },
+        );
+        for (const section of sections) observer.observe(section);
+      }
+
+      function applyFilter(term) {
+        const needle = term.trim().toLowerCase();
+        const visible = new Set();
+
+        for (const section of document.querySelectorAll('section.method')) {
+          const hit =
+            !needle ||
+            section.id.toLowerCase().includes(needle) ||
+            section.textContent.toLowerCase().includes(needle);
+          section.hidden = !hit;
+          if (hit) visible.add(section.id);
+        }
+        for (const row of document.querySelectorAll('.index a.row'))
+          row.hidden = needle && !visible.has(decodeURIComponent(row.getAttribute('href').slice(1)));
+        for (const link of document.querySelectorAll('nav a.item'))
+          link.hidden = needle && !visible.has(decodeURIComponent(link.getAttribute('href').slice(1)));
+
+        // A category with nothing left in it goes too, so a filtered page has no empty headings.
+        for (const category of document.querySelectorAll('section.category')) {
+          const anyMethod = category.querySelector('section.method:not([hidden])');
+          category.hidden = needle && !anyMethod && category.id !== 'tag-errors';
+          if (category.id === 'tag-errors') category.hidden = !!needle;
+        }
+        for (const group of document.querySelectorAll('nav .group'))
+          group.hidden = needle && !group.querySelector('a.item:not([hidden])');
+
+        document.body.classList.toggle('filtered-empty', !!needle && visible.size === 0);
+      }
+
+      // ---- console --------------------------------------------------------------------
+      // A JSON-RPC client for the socket this document describes. It talks to the real server on
+      // this host, so anything sent here happens for real.
+
+      const LIFECYCLE = ['disconnected', 'open', 'authenticated', 'subscribed'];
+      let socket = null;
+      let nextId = 1;
+      let authenticated = false;
+      let subscribed = false;
+      const pending = new Map();
+
+      function socketUrl(path) {
+        if (!path) path = '/';
+        if (/^wss?:/.test(path)) return path;
+        const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${scheme}//${location.host}${path}`;
+      }
+
+      function setState(label, step, failed) {
+        el('state').textContent = label;
+        el('ribbon').className = `ribbon${failed ? ' err' : ''}${step ? ` at-${step}` : ''}`;
+      }
+
+      function refreshState() {
+        if (!socket) return setState('disconnected', 0, false);
+        if (subscribed) return setState('subscribed', 4, false);
+        if (authenticated) return setState('authenticated', 3, false);
+        return setState('open', 2, false);
+      }
+
+      function log(kind, head, payload) {
+        const entry = document.createElement('div');
+        entry.className = `entry ${kind}`;
+        entry.innerHTML =
+          `<div class="head">${escapeHtml(new Date().toLocaleTimeString())} · ${escapeHtml(head)}</div>` +
+          (payload === undefined
+            ? ''
+            : `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`);
+        const pane = el('log');
+        pane.appendChild(entry);
+        pane.scrollTop = pane.scrollHeight;
+      }
+
+      function setConsoleOpen(open) {
+        el('console').classList.toggle('collapsed', !open);
+        document.body.classList.toggle('console-open', open);
+        el('toggle').textContent = open ? 'Console ▼' : 'Console ▲';
+        el('toggle').setAttribute('aria-expanded', String(open));
+      }
+
+      function connect() {
+        disconnect();
+        const url = el('ws-url').value.trim();
+        setState('connecting', 1, false);
+        log('note', `connecting to ${url}`);
+
+        try {
+          socket = new WebSocket(url);
+        } catch (error) {
+          setState('failed', 0, true);
+          log('err', `could not open the socket: ${error.message}`);
+          socket = null;
+          return;
+        }
+
+        el('disconnect').disabled = false;
+        socket.onopen = () => {
+          refreshState();
+          // The server closes a connection that stays unauthenticated, so authenticate straight
+          // away when there is a token to do it with.
+          const token = el('token').value.trim();
+          if (token) call('auth.v1.authenticate', { token });
+          else log('note', 'connected. Authenticate before calling anything else.');
+        };
+
+        socket.onmessage = (event) => {
+          let message;
+          try {
+            message = JSON.parse(event.data);
+          } catch {
+            log('err', 'unparseable frame', event.data);
+            return;
+          }
+          if (message.id === undefined || message.id === null) {
+            log('push', `notification · ${message.method || '?'}`, message.params);
+            return;
+          }
+          const name = pending.get(message.id) || '?';
+          pending.delete(message.id);
+          if (message.error) {
+            log('err', `error · ${name}`, message.error);
+            return;
+          }
+          log('in', `result · ${name}`, message.result);
+          if (name.startsWith('auth.')) authenticated = true;
+          if (name.includes('subscribe') && !name.includes('unsubscribe')) subscribed = true;
+          refreshState();
+        };
+
+        socket.onerror = () => log('err', 'socket error');
+        socket.onclose = (event) => {
+          socket = null;
+          authenticated = false;
+          subscribed = false;
+          el('disconnect').disabled = true;
+          setState('disconnected', 0, event.code !== 1000 && event.code !== 1005);
+          log('note', `closed · code ${event.code}${event.reason ? ` · ${event.reason}` : ''}`);
+        };
+      }
+
+      function disconnect() {
+        if (!socket) return;
+        socket.onclose = null;
+        socket.close(1000, 'console');
+        socket = null;
+        authenticated = false;
+        subscribed = false;
+        el('disconnect').disabled = true;
+        refreshState();
+      }
+
+      function call(method, params) {
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          log('err', 'not connected');
+          return;
+        }
+        const request = { jsonrpc: '2.0', id: nextId++, method, params: params || {} };
+        pending.set(request.id, method);
+        log('out', `call · ${method}`, request);
+        socket.send(JSON.stringify(request));
+      }
+
+      // A starting point for the params object: the required descriptors, with a value of the
+      // right shape. Optional ones are left out — the table on the page lists them.
+      function sampleValue(schema) {
+        if (!schema || typeof schema !== 'object') return null;
+        if (schema.default !== undefined) return schema.default;
+        if (schema.const !== undefined) return schema.const;
+        if (schema.enum) return schema.enum[0];
+        const variants = schema.anyOf || schema.oneOf;
+        if (variants) return sampleValue(variants[0]);
+        const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+        if (types.includes('integer') || types.includes('number')) return 0;
+        if (types.includes('boolean')) return false;
+        if (types.includes('array')) return [sampleValue(schema.items)];
+        if (types.includes('object') || schema.properties) {
+          const required = new Set(schema.required || []);
+          return Object.fromEntries(
+            Object.entries(schema.properties || {})
+              .filter(([name]) => required.has(name))
+              .map(([name, property]) => [name, sampleValue(property)]),
+          );
+        }
+        if (types.includes('string')) return '';
+        return null;
+      }
+
+      function skeleton(method) {
+        return Object.fromEntries(
+          (method.params || [])
+            .filter((param) => param.required)
+            .map((param) => [param.name, sampleValue(param.schema)]),
+        );
+      }
+
+      function selectMethod(name) {
+        el('call-method').value = name;
+        const method = methodsByName.get(name);
+        el('params').value = JSON.stringify(method ? skeleton(method) : {}, null, 2);
+      }
+
+      function wireConsole(names, serverPath) {
+        el('ws-url').value = socketUrl(serverPath);
+        el('call-method').innerHTML = names
+          .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+          .join('');
+        if (names.length) selectMethod(names[0]);
+
+        el('toggle').addEventListener('click', () =>
+          setConsoleOpen(el('console').classList.contains('collapsed')),
+        );
+        el('connect').addEventListener('click', connect);
+        el('disconnect').addEventListener('click', disconnect);
+        el('clear').addEventListener('click', () => (el('log').innerHTML = ''));
+        el('reset').addEventListener('click', () => selectMethod(el('call-method').value));
+        el('call-method').addEventListener('change', (e) => selectMethod(e.target.value));
+        el('send').addEventListener('click', () => {
+          const text = el('params').value.trim();
+          let params;
+          try {
+            params = text ? JSON.parse(text) : {};
+          } catch (error) {
+            log('err', `params are not valid JSON: ${error.message}`);
+            return;
+          }
+          call(el('call-method').value, params);
+        });
+
+        for (const button of document.querySelectorAll('button.try'))
+          button.addEventListener('click', () => {
+            selectMethod(button.dataset.method);
+            setConsoleOpen(true);
+            el('params').focus();
+          });
+      }
+
+      // ---- page -----------------------------------------------------------------------
+
+      // The four steps every session goes through, named with the calls that make them happen —
+      // the part of this API a REST reference has no equivalent for.
+      function lifecycle(doc, groups) {
+        const link = (name) => `<a href="#${escapeHtml(name)}">${escapeHtml(name)}</a>`;
+        const authMethod = [...methodsByName.keys()].find((n) => n.startsWith('auth.'));
+        const subscribeMethod = [...methodsByName.keys()].find((n) => n.endsWith('.subscribe'));
+        const pushGroup = groups.find((g) => g.isNotifications);
+
+        const steps = [
+          ['Upgrade', 'Open', escapeHtml((doc.servers || [])[0]?.url || '/')],
+          ['First call', 'Authenticate', authMethod ? link(authMethod) : 'before anything else'],
+          ['Then', 'Call', `${methodsByName.size} methods, answered by id`],
+          [
+            'Meanwhile',
+            'Listen',
+            pushGroup ? `${pushGroup.methods.length} server events, unprompted` : '—',
+          ],
+        ];
+
+        return `<div class="lifecycle">${steps
+          .map(
+            ([when, what, how]) => `<div class="step">
+              <div class="when">${escapeHtml(when)}</div>
+              <div class="what">${escapeHtml(what)}</div>
+              <div class="how">${how}</div>
+            </div>`,
+          )
+          .join('')}</div>`;
+      }
+
+      function renderLinks() {
+        const all = [...LINKS, { label: 'OpenRPC document', href: DOCUMENT_URL }];
+        el('links').innerHTML = all
+          .map((l) => `<a href="${escapeHtml(l.href)}">${escapeHtml(l.label)}</a>`)
+          .join('');
+      }
+
+      function failed(message) {
+        el('main').innerHTML = `<div id="load-error">
+          <p><strong>Could not load ${escapeHtml(DOCUMENT_URL)}</strong></p>
+          <p>${escapeHtml(message)}</p>
+        </div>`;
+      }
+
+      async function render() {
+        let doc;
+        try {
+          const response = await fetch(DOCUMENT_URL);
+          if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+          doc = await response.json();
+        } catch (error) {
+          failed(error.message);
+          return;
+        }
+
+        const info = doc.info || {};
+        for (const method of doc.methods || []) methodsByName.set(method.name, method);
+        const groups = categorize(doc);
+        const hoisted = hoistedStability(doc.methods || []);
+
+        document.title = info.title || 'Realtime API';
+        el('side-title').textContent = info.title || 'Realtime API';
+        el('side-version').textContent = `v${info.version || '—'} · OpenRPC ${doc.openrpc || '—'}`;
+        renderLinks();
+
+        const server = (doc.servers || [])[0];
+        el('main').innerHTML = `
+          <div class="page-head">
+            <h1>${escapeHtml(info.title || 'Realtime API')}</h1>
+            <div class="lede">${prose(info.description)}</div>
+            ${noticeBlock(hoisted)}
+            ${lifecycle(doc, groups)}
+            ${
+              server
+                ? `<div class="endpoint">
+                    <span class="eyebrow">Endpoint</span>
+                    <div class="row">
+                      <span class="url">${escapeHtml(server.url)}</span>
+                      <span class="note">${escapeHtml(server.summary || server.description || '')}</span>
+                    </div>
+                  </div>`
+                : ''
+            }
+          </div>
+          ${groups.map((group) => renderCategory(group, hoisted)).join('')}
+          ${renderErrors(doc)}
+        `;
+
+        renderNav(groups);
+        trackScroll();
+        wireConsole(
+          (doc.methods || []).map((m) => m.name),
+          server && server.url,
+        );
+
+        el('filter').addEventListener('input', (event) => applyFilter(event.target.value));
+        document.addEventListener('keydown', (event) => {
+          if (event.key === '/' && event.target === document.body) {
+            event.preventDefault();
+            el('filter').focus();
+          }
+          if (event.key === 'Escape' && event.target === el('filter')) {
+            el('filter').value = '';
+            applyFilter('');
+            el('filter').blur();
+          }
+        });
+
+        // A deep link has to land after the document is rendered — the target did not exist when
+        // the browser first tried. Instantly, not smoothly: arriving is not navigating.
+        if (location.hash) {
+          const target = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+          // "instant", not "auto": auto defers to the stylesheet's smooth scrolling, which would
+          // animate the whole document height before the reader sees where they landed.
+          if (target) target.scrollIntoView({ behavior: 'instant' });
+        }
+      }
+
+      render();
+    </script>
+  </body>
+</html>
