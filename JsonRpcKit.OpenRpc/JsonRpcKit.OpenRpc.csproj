@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>JsonRpcKit.OpenRpc</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <Description>Generates an OpenRPC document from the same [RpcMethod] scan JsonRpcKit dispatches on, and serves it from an endpoint.</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

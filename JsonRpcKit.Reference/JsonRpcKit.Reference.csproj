@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>JsonRpcKit.Reference</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <Description>Renders an OpenRPC document as a browsable reference page with a live JSON-RPC console.</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

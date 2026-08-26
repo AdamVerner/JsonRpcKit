@@ -6,5 +6,24 @@
     <LangVersion>latest</LangVersion>
     <!-- Build and ship documentation -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Each of the three libraries opts back in; tests and anything new stay out of the feed. -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
+
+  <!-- NuGet package metadata (applies to packable projects only) -->
+  <PropertyGroup>
+    <Version>0.0.1</Version>
+    <Authors>Adam Verner</Authors>
+    <Copyright>Copyright © 2026 Adam Verner</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>jsonrpc;json-rpc;websocket;openrpc;aspnetcore</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/AdamVerner/JsonRpcKit</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/AdamVerner/JsonRpcKit</PackageProjectUrl>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="/" Visible="false" />
+  </ItemGroup>
 </Project>

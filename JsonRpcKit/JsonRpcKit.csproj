@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>JsonRpcKit</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <Description>JSON-RPC 2.0 over WebSocket for ASP.NET Core: a dispatcher that routes to [RpcMethod]-attributed targets, with per-connection scopes, batching and typed errors.</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
