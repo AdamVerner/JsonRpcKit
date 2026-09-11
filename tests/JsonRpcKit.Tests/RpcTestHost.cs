@@ -22,6 +22,7 @@ internal sealed class RpcTestHost : IAsyncDisposable
 
     private readonly WebApplication _app;
     private readonly WsRpcDispatcherOptions _options;
+    private readonly Action<WsRpcDispatcher>? _configure;
 
     private readonly TaskCompletionSource<string> _closeSignal = new(
         TaskCreationOptions.RunContinuationsAsynchronously
@@ -30,10 +31,15 @@ internal sealed class RpcTestHost : IAsyncDisposable
         TaskCreationOptions.RunContinuationsAsynchronously
     );
 
-    private RpcTestHost(WebApplication app, WsRpcDispatcherOptions options)
+    private RpcTestHost(
+        WebApplication app,
+        WsRpcDispatcherOptions options,
+        Action<WsRpcDispatcher>? configure
+    )
     {
         _app = app;
         _options = options;
+        _configure = configure;
     }
 
     internal TestServer Server => (TestServer)_app.Services.GetRequiredService<IServer>();
@@ -44,13 +50,17 @@ internal sealed class RpcTestHost : IAsyncDisposable
     /// <summary>The size the dispatcher reported to <c>OnMessageTooLarge</c>.</summary>
     internal Task<long> OversizeReport => _tooLarge.Task;
 
-    internal static async Task<RpcTestHost> StartAsync(WsRpcDispatcherOptions? options = null)
+    /// <param name="configure">Runs on each dispatcher before it listens; where a test adds middleware.</param>
+    internal static async Task<RpcTestHost> StartAsync(
+        WsRpcDispatcherOptions? options = null,
+        Action<WsRpcDispatcher>? configure = null
+    )
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.WebHost.UseTestServer();
 
         var app = builder.Build();
-        var host = new RpcTestHost(app, options ?? new WsRpcDispatcherOptions());
+        var host = new RpcTestHost(app, options ?? new WsRpcDispatcherOptions(), configure);
 
         app.UseWebSockets();
         app.MapGet(Path, host.ServeAsync);
@@ -76,6 +86,7 @@ internal sealed class RpcTestHost : IAsyncDisposable
             _options
         );
         dispatcher.OnMessageTooLarge = bytes => _tooLarge.TrySetResult(bytes);
+        _configure?.Invoke(dispatcher);
         dispatcher.StartListening();
 
         await Task.WhenAny(dispatcher.Completion, _closeSignal.Task);

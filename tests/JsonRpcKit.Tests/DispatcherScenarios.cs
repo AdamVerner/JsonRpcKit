@@ -48,6 +48,46 @@ public sealed class DispatcherScenarios
     }
 
     [Fact]
+    public async Task Middleware_WrapsEveryHandler_InRegistrationOrder_AndCanRefuse()
+    {
+        var trace = new List<string>();
+        await using var host = await RpcTestHost.StartAsync(configure: dispatcher =>
+        {
+            dispatcher.Use(
+                async (ctx, next) =>
+                {
+                    trace.Add($"outer:{ctx.MethodName}");
+                    var result = await next(ctx);
+                    trace.Add("outer:done");
+                    return result;
+                }
+            );
+            dispatcher.Use(
+                (ctx, next) =>
+                {
+                    trace.Add($"inner:{ctx.Arguments.Length}");
+                    return ctx.Method.Name == nameof(ProbeTarget.Filter)
+                        ? throw new RpcException("Refused by middleware", 4000)
+                        : next(ctx);
+                }
+            );
+        });
+        await using var client = await RpcTestClient.ConnectAsync(host);
+
+        var ids = await client.InvokeAsync<int[]>("probe.v1.ids", new { ids = new[] { 1, 2 } });
+        Assert.Equal([1, 2], ids);
+        Assert.Equal(["outer:probe.v1.ids", "inner:1", "outer:done"], trace);
+
+        // Params are bound before the pipeline runs, so a refusal is on a call that would have
+        // reached the handler; the error code and message reach the client unchanged.
+        var ex = await Assert.ThrowsAsync<RemoteInvocationException>(() =>
+            client.InvokeAsync<object>("probe.v1.filter", new { })
+        );
+        Assert.Equal(4000, ex.ErrorCode);
+        Assert.Equal("Refused by middleware", ex.Message);
+    }
+
+    [Fact]
     public async Task AMessageOverTheSizeLimit_EndsTheConnectionWithoutBufferingIt()
     {
         await using var host = await RpcTestHost.StartAsync(

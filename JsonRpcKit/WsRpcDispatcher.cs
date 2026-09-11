@@ -207,6 +207,27 @@ public sealed class WsRpcDispatcher
     /// </summary>
     public Action<long>? OnMessageTooLarge { get; set; }
 
+    private readonly List<RpcCallMiddleware> _middleware = [];
+    private RpcCallDelegate _pipeline = InvokeHandlerAsync;
+
+    /// <summary>
+    /// Adds a middleware around every handler invocation. Runs after authentication and params
+    /// validation, inside the call's service scope; the first added is the outermost. Call before
+    /// <see cref="StartListening"/>.
+    /// </summary>
+    public void Use(RpcCallMiddleware middleware)
+    {
+        _middleware.Add(middleware);
+        RpcCallDelegate pipeline = InvokeHandlerAsync;
+        for (var i = _middleware.Count - 1; i >= 0; i--)
+        {
+            var current = _middleware[i];
+            var next = pipeline;
+            pipeline = context => current(context, next);
+        }
+        _pipeline = pipeline;
+    }
+
     /// <summary>Starts the background read loop. Call once after all setup is complete.</summary>
     public void StartListening() => _ = Task.Run(ReadLoopAsync);
 
@@ -539,7 +560,9 @@ public sealed class WsRpcDispatcher
             {
                 var target = entry.Factory(provider, null);
                 var args = entry.ParamType is null ? [] : new[] { paramsArg };
-                resultValue = await InvokeAsync(entry.Method, target, args);
+                resultValue = await _pipeline(
+                    new RpcCallContext(method, entry.Method, target, args, provider, _httpContext)
+                );
             }
 
             if (haveId)
@@ -575,6 +598,9 @@ public sealed class WsRpcDispatcher
                 )
             )
             .ToList();
+
+    private static Task<object?> InvokeHandlerAsync(RpcCallContext context) =>
+        InvokeAsync(context.Method, context.Target, context.Arguments);
 
     private static async Task<object?> InvokeAsync(MethodInfo method, object target, object?[] args)
     {

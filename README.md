@@ -96,6 +96,20 @@ dispatcher.StartListening();
 
 `HttpContext` is always registered automatically and injectable by name in target constructors.
 
+### 4. Per-call middleware (optional)
+
+```csharp
+dispatcher.Use(async (ctx, next) =>
+{
+    if (ctx.Method.GetCustomAttribute<InternalOnlyAttribute>() is not null && !IsInternal(ctx.HttpContext))
+        throw new RpcException("Internal method", 4001);
+    return await next(ctx);
+});
+```
+
+Runs after authentication and params validation, inside the call's service scope (`ctx.Services`), around
+the handler. The first middleware added is the outermost. Add before `StartListening()`.
+
 ## Authentication
 
 The dispatcher checks `httpContext.User.Identity.IsAuthenticated` before dispatching any method not marked `AllowUnauthenticated = true`. An unauthenticated call gets error code 1002 and the `closeSignal` is set so the caller can close the connection.
