@@ -9,5 +9,6 @@ namespace JsonRpcKit;
 /// </summary>
 public interface IRpcSchemaProvider
 {
+    /// <summary>The schema for the converted type. The caller clones it before editing.</summary>
     JsonNode GetSchema();
 }
