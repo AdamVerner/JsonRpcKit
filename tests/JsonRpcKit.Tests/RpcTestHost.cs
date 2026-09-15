@@ -1,5 +1,7 @@
 using System.Net.WebSockets;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -18,7 +20,10 @@ internal sealed class RpcTestHost : IAsyncDisposable
 {
     internal const string Path = "/rpc";
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new ProbeTagConverter() },
+    };
 
     private readonly WebApplication _app;
     private readonly WsRpcDispatcherOptions _options;
@@ -109,6 +114,40 @@ internal sealed class RpcTestHost : IAsyncDisposable
 
 internal sealed record ProbeIdsParams(IReadOnlyList<int> Ids);
 
+internal sealed record ProbeTagParams(
+    ProbeTag Tag,
+    ProbeTag? Parent = null,
+    IReadOnlyList<ProbeTag>? More = null
+);
+
+// A value the wire carries as "tag:<letters>"; only tags starting with 'a' decode, so a value can
+// pass the schema's pattern and still be refused by the converter.
+internal readonly record struct ProbeTag(string Name);
+
+internal sealed class ProbeTagConverter : JsonConverter<ProbeTag>, IRpcSchemaProvider
+{
+    public JsonNode GetSchema() =>
+        new JsonObject { ["type"] = "string", ["pattern"] = "^tag:[a-z]+$" };
+
+    public override ProbeTag Read(
+        ref Utf8JsonReader reader,
+        Type typeToConvert,
+        JsonSerializerOptions options
+    )
+    {
+        var name = reader.GetString()!["tag:".Length..];
+        return name.StartsWith('a')
+            ? new ProbeTag(name)
+            : throw new JsonException($"unknown tag {name}");
+    }
+
+    public override void Write(
+        Utf8JsonWriter writer,
+        ProbeTag value,
+        JsonSerializerOptions options
+    ) => writer.WriteStringValue("tag:" + value.Name);
+}
+
 internal sealed record ProbeFilterParams(string? NameFilter = null);
 
 internal sealed record ProbeFilterResult(string? NameFilter);
@@ -126,4 +165,7 @@ internal sealed class ProbeTarget
         AllowUnauthenticated = true
     )]
     public ProbeFilterResult Filter(ProbeFilterParams request) => new(request.NameFilter);
+
+    [RpcMethod("probe.v1.tag", Summary = "Echo the tag it was given.", AllowUnauthenticated = true)]
+    public string Tag(ProbeTagParams request) => request.Tag.Name + (request.Parent?.Name ?? "");
 }

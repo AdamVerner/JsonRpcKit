@@ -542,8 +542,21 @@ public sealed class WsRpcDispatcher
                         new { validationErrors = CollectValidationErrors(evaluation) }
                     );
 
-                if (hasParams)
-                    paramsArg = p.Deserialize(entry.ParamType, _jsonOptions);
+                // The schema admits what a converter then refuses (a well-formed but invalid id),
+                // which is still the caller's params, not our failure.
+                try
+                {
+                    if (hasParams)
+                        paramsArg = p.Deserialize(entry.ParamType, _jsonOptions);
+                }
+                catch (JsonException ex)
+                {
+                    throw new RpcException(
+                        "Invalid params",
+                        (int)RpcErrorCode.InvalidParams,
+                        new { validationErrors = new[] { ex.Message } }
+                    );
+                }
                 paramsArg ??= Activator.CreateInstance(entry.ParamType);
             }
 

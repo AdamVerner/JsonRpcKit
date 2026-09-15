@@ -24,6 +24,67 @@ public static class RpcSchema
         TransformSchemaNode = AddDescription,
     };
 
+    // JsonSchemaExporter emits an accept-anything node for a type with a custom converter and does
+    // not run TransformSchemaNode for it in nullable or element position, so the converter's own
+    // schema is written in afterwards by walking the type the way the exporter did.
+    private static void ApplyConverterSchemas(
+        JsonSerializerOptions options,
+        JsonTypeInfo typeInfo,
+        JsonNode? node,
+        HashSet<Type> visiting
+    )
+    {
+        if (node is not JsonObject obj || !visiting.Add(typeInfo.Type))
+            return;
+        switch (typeInfo.Kind)
+        {
+            case JsonTypeInfoKind.Object when obj["properties"] is JsonObject properties:
+                foreach (var property in typeInfo.Properties)
+                    properties[property.Name] = Describe(
+                        options,
+                        property.PropertyType,
+                        properties[property.Name],
+                        visiting
+                    );
+                break;
+            case JsonTypeInfoKind.Enumerable when typeInfo.ElementType is { } element:
+                obj["items"] = Describe(options, element, obj["items"], visiting);
+                break;
+            case JsonTypeInfoKind.Dictionary when typeInfo.ElementType is { } value:
+                obj["additionalProperties"] = Describe(
+                    options,
+                    value,
+                    obj["additionalProperties"],
+                    visiting
+                );
+                break;
+        }
+        visiting.Remove(typeInfo.Type);
+    }
+
+    private static JsonNode? Describe(
+        JsonSerializerOptions options,
+        Type type,
+        JsonNode? node,
+        HashSet<Type> visiting
+    )
+    {
+        var underlying = Nullable.GetUnderlyingType(type);
+        if (options.GetConverter(underlying ?? type) is IRpcSchemaProvider provider)
+        {
+            var schema = (JsonObject)provider.GetSchema().DeepClone();
+            if (underlying is not null && schema["type"] is JsonValue t)
+                schema["type"] = new JsonArray(t.DeepClone(), "null");
+            if (node is JsonObject old)
+                foreach (var key in new[] { "description", "default" })
+                    if (old[key] is { } kept)
+                        schema[key] = kept.DeepClone();
+            return schema;
+        }
+        ApplyConverterSchemas(options, options.GetTypeInfo(underlying ?? type), node, visiting);
+        return node;
+    }
+
     // Surfaces [Description] attributes (on a property/parameter, or on the type itself) into
     // the schema's "description" keyword, so param and result fields carry documentation. On a
     // record's positional parameter the attribute must target the generated property —
@@ -50,8 +111,13 @@ public static class RpcSchema
     /// serializer options the dispatcher uses on the wire so the schema matches the actual
     /// wire format.
     /// </summary>
-    public static JsonNode Generate(JsonSerializerOptions options, Type type) =>
-        WithResolver(options).GetJsonSchemaAsNode(type, ExporterOptions);
+    public static JsonNode Generate(JsonSerializerOptions options, Type type)
+    {
+        var resolved = WithResolver(options);
+        var schema = resolved.GetJsonSchemaAsNode(type, ExporterOptions);
+        var root = Describe(resolved, type, schema, []);
+        return root ?? schema;
+    }
 
     // JsonSchemaExporter needs an explicit TypeInfoResolver: a JsonSerializerOptions instance
     // doesn't attach the reflection-based resolver until it's first used for (de)serialization,

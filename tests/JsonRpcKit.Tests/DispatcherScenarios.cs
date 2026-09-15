@@ -35,6 +35,40 @@ public sealed class DispatcherScenarios
     }
 
     [Fact]
+    public async Task Params_WithAConverterDescribedType_ValidateAgainstTheConverterSchema()
+    {
+        var schema = RpcSchema.Generate(RpcTestHost.JsonOptions, typeof(ProbeTagParams));
+        Assert.Equal("^tag:[a-z]+$", schema["properties"]!["tag"]!["pattern"]!.GetValue<string>());
+        Assert.Equal(
+            """["string","null"]""",
+            schema["properties"]!["parent"]!["type"]!.ToJsonString()
+        );
+        Assert.Equal(
+            "^tag:[a-z]+$",
+            schema["properties"]!["more"]!["items"]!["pattern"]!.GetValue<string>()
+        );
+
+        await using var host = await RpcTestHost.StartAsync();
+        await using var client = await RpcTestClient.ConnectAsync(host);
+
+        Assert.Equal(
+            "abc",
+            await client.InvokeAsync<string>("probe.v1.tag", new { tag = "tag:abc" })
+        );
+
+        // Fails the pattern: refused by the schema.
+        var ex = await Assert.ThrowsAsync<RemoteMethodNotFoundException>(() =>
+            client.InvokeAsync<string>("probe.v1.tag", new { tag = "abc" })
+        );
+        Assert.Contains("Invalid params", ex.Message);
+        // Passes the pattern, refused by the converter: still the caller's fault, same code.
+        ex = await Assert.ThrowsAsync<RemoteMethodNotFoundException>(() =>
+            client.InvokeAsync<string>("probe.v1.tag", new { tag = "tag:xyz" })
+        );
+        Assert.Contains("Invalid params", ex.Message);
+    }
+
+    [Fact]
     public async Task Params_OmittedEntirely_BindTheirDefaults()
     {
         await using var host = await RpcTestHost.StartAsync();
