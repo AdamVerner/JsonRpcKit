@@ -45,6 +45,7 @@ public sealed class OpenRpcParamsScenarios
         var pointers = Pointers(schema).ToList();
         Assert.NotEmpty(pointers);
         Assert.All(pointers, p => Assert.NotNull(Resolve(schema, p)));
+        Assert.DoesNotContain(":null", schema.ToJsonString());
     }
 
     private static JsonObject Param(Type type, string name)

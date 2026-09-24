@@ -34,7 +34,8 @@ public static class RpcSchema
         HashSet<Type> visiting
     )
     {
-        if (node is not JsonObject obj || !visiting.Add(typeInfo.Type))
+        // A $ref node points at a copy of the type that is filled in where it stands.
+        if (node is not JsonObject obj || obj.ContainsKey("$ref") || !visiting.Add(typeInfo.Type))
             return;
         switch (typeInfo.Kind)
         {
