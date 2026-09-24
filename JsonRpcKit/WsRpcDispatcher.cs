@@ -599,18 +599,45 @@ public sealed class WsRpcDispatcher
 
     // A union param is evaluated against every branch, and each branch reports its own failures.
     // The branch whose discriminator did not match is not the one the caller meant, so its
-    // complaints are dropped; if every branch was rejected that way, the discriminator failures are
-    // the answer. The schema library writes a const value JSON-encoded inside its quotes.
+    // complaints about that union value are dropped; if every branch was rejected that way, the
+    // discriminator failures are the answer. Array elements share branch paths, so a rejection is
+    // keyed by the union value's instance location too.
     private static List<object> CollectValidationErrors(EvaluationResults results)
     {
-        var failed = (results.Details ?? []).Where(d => d.Errors is { Count: > 0 }).ToList();
+        var details = results.Details ?? [];
+        var failed = details.Where(d => d.Errors is { Count: > 0 }).ToList();
         var discriminators = failed
             .Where(d => d.Errors!.ContainsKey("const") && Branch(d) is not null)
+            .Select(d =>
+                (
+                    failure: d,
+                    branch: Branch(d)!,
+                    union: d.InstanceLocation.ToString()[
+                        ..d.InstanceLocation.ToString().LastIndexOf('/')
+                    ]
+                )
+            )
             .ToList();
-        var rejected = discriminators.Select(d => Branch(d)! + "/").ToList();
-        var kept = failed.Where(d => !rejected.Any((d.EvaluationPath + "/").StartsWith)).ToList();
+        var kept = failed
+            .Where(d =>
+                !discriminators.Any(r =>
+                    Under(d.EvaluationPath.ToString(), r.branch)
+                    && Under(d.InstanceLocation.ToString(), r.union)
+                )
+            )
+            .ToList();
+        var unanswered = discriminators
+            .Where(r =>
+                !kept.Any(d => Under(d.InstanceLocation.ToString(), r.union))
+                && !details.Any(d =>
+                    d.IsValid
+                    && d.InstanceLocation.ToString() == r.union
+                    && d.EvaluationPath.ToString() == r.branch[..r.branch.LastIndexOf("/anyOf/")]
+                )
+            )
+            .Select(r => r.failure);
 
-        return (kept.Count > 0 ? kept : discriminators)
+        return kept.Concat(unanswered)
             .SelectMany(d =>
                 d.Errors!.Select(e =>
                     (object)
@@ -620,9 +647,17 @@ public sealed class WsRpcDispatcher
                             keyword = e.Key == ""
                                 ? d.EvaluationPath.ToString().Split('/')[^1]
                                 : e.Key,
-                            message = e.Key == ""
-                                ? "Not an allowed member."
-                                : e.Value.Replace("\\u0022", ""),
+                            message = e.Key switch
+                            {
+                                "" => "Not an allowed member.",
+                                // The library writes `Expected "<value as JSON, quotes escaped>"`.
+                                "const" => Regex.Replace(
+                                    e.Value,
+                                    "\"(.*)\"$",
+                                    m => m.Groups[1].Value.Replace("\\u0022", "\"")
+                                ),
+                                _ => e.Value,
+                            },
                         }
                 )
             )
@@ -636,6 +671,9 @@ public sealed class WsRpcDispatcher
             is { Success: true } m
             ? m.Groups[1].Value
             : null;
+
+    private static bool Under(string pointer, string prefix) =>
+        (pointer + "/").StartsWith(prefix + "/");
 
     private static Task<object?> InvokeHandlerAsync(RpcCallContext context) =>
         InvokeAsync(context.Method, context.Target, context.Arguments);

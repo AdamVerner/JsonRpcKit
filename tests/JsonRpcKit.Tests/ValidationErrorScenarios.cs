@@ -30,6 +30,18 @@ public sealed class ValidationErrorScenarios
         Assert.Contains("label", error.GetProperty("message").GetString());
     }
 
+    // Each element rejects a different branch, so a rejection is only good for its own element.
+    [Fact]
+    public async Task Mixed_elements_keep_the_real_complaint()
+    {
+        var errors = await ErrorsAsync(
+            """[{"type":"circle","size":{"value":1}},{"type":"square","size":{"value":1},"label":"x","extra":1}]"""
+        );
+
+        var error = Assert.Single(errors.EnumerateArray());
+        Assert.Equal("/shapes/1/extra", error.GetProperty("path").GetString());
+    }
+
     [Fact]
     public async Task An_unknown_discriminator_lists_the_values_it_could_have_been()
     {
