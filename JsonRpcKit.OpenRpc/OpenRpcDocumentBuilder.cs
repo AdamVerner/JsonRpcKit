@@ -247,8 +247,80 @@ public static class OpenRpcDocumentBuilder
             .OrderByDescending(p => required.Contains(p.Key))
             // DeepClone so each property schema is detached from the parent object it was read
             // from — a JsonNode can only have one parent.
-            .Select(p => ContentDescriptor(p.Key, p.Value!.DeepClone(), required.Contains(p.Key)))
+            .Select(p =>
+                ContentDescriptor(
+                    p.Key,
+                    Rebase(p.Value!.DeepClone(), p.Key, obj),
+                    required.Contains(p.Key)
+                )
+            )
             .ToJsonArray();
+    }
+
+    // The exporter writes a repeated type as a $ref from the root of the whole params object, which
+    // a descriptor's schema no longer sits under: `#/properties/config/...` in the `config`
+    // descriptor is `#/...`, and a pointer into another param is copied into `$defs` once, so a
+    // recursive type still ends.
+    private static JsonNode Rebase(JsonNode schema, string name, JsonObject root)
+    {
+        var own = $"#/properties/{Escape(name)}";
+        var defs = new JsonObject();
+        var pending = new Queue<JsonNode>(Descendants(schema));
+        while (pending.TryDequeue(out var node))
+        {
+            if (node is not JsonObject obj || obj["$ref"]?.GetValue<string>() is not { } pointer)
+                continue;
+            if (pointer == own || pointer.StartsWith(own + "/"))
+            {
+                obj["$ref"] = "#" + pointer[own.Length..];
+                continue;
+            }
+            var key = pointer.TrimStart('#', '/');
+            obj["$ref"] = $"#/$defs/{Escape(key)}";
+            if (defs.ContainsKey(key) || Resolve(root, pointer) is not { } target)
+                continue;
+            var copy = target.DeepClone();
+            defs[key] = copy;
+            foreach (var d in Descendants(copy))
+                pending.Enqueue(d);
+        }
+        if (defs.Count > 0)
+            schema["$defs"] = defs;
+        return schema;
+    }
+
+    private static string Escape(string token) => token.Replace("~", "~0").Replace("/", "~1");
+
+    private static IEnumerable<JsonNode> Descendants(JsonNode node)
+    {
+        yield return node;
+        var children = node switch
+        {
+            JsonObject o => o.Select(p => p.Value),
+            JsonArray a => a,
+            _ => [],
+        };
+        foreach (var child in children.OfType<JsonNode>())
+        foreach (var d in Descendants(child))
+            yield return d;
+    }
+
+    private static JsonNode? Resolve(JsonNode root, string pointer)
+    {
+        JsonNode? node = root;
+        foreach (
+            var raw in pointer.TrimStart('#').Split('/', StringSplitOptions.RemoveEmptyEntries)
+        )
+        {
+            var token = raw.Replace("~1", "/").Replace("~0", "~");
+            node = node switch
+            {
+                JsonObject o => o[token],
+                JsonArray a when int.TryParse(token, out var i) && i < a.Count => a[i],
+                _ => null,
+            };
+        }
+        return node;
     }
 
     private static JsonObject ContentDescriptor(string name, JsonNode schema, bool required) =>

@@ -5,6 +5,7 @@ using System.Net.WebSockets;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Json.Schema;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -596,21 +597,45 @@ public sealed class WsRpcDispatcher
         }
     }
 
-    private static List<object> CollectValidationErrors(EvaluationResults results) =>
-        (results.Details ?? [])
-            .Where(d => d.Errors is { Count: > 0 })
+    // A union param is evaluated against every branch, and each branch reports its own failures.
+    // The branch whose discriminator did not match is not the one the caller meant, so its
+    // complaints are dropped; if every branch was rejected that way, the discriminator failures are
+    // the answer. The schema library writes a const value JSON-encoded inside its quotes.
+    private static List<object> CollectValidationErrors(EvaluationResults results)
+    {
+        var failed = (results.Details ?? []).Where(d => d.Errors is { Count: > 0 }).ToList();
+        var discriminators = failed
+            .Where(d => d.Errors!.ContainsKey("const") && Branch(d) is not null)
+            .ToList();
+        var rejected = discriminators.Select(d => Branch(d)! + "/").ToList();
+        var kept = failed.Where(d => !rejected.Any((d.EvaluationPath + "/").StartsWith)).ToList();
+
+        return (kept.Count > 0 ? kept : discriminators)
             .SelectMany(d =>
                 d.Errors!.Select(e =>
                     (object)
                         new
                         {
                             path = d.InstanceLocation.ToString(),
-                            keyword = e.Key,
-                            message = e.Value,
+                            keyword = e.Key == ""
+                                ? d.EvaluationPath.ToString().Split('/')[^1]
+                                : e.Key,
+                            message = e.Key == ""
+                                ? "Not an allowed member."
+                                : e.Value.Replace("\\u0022", ""),
                         }
                 )
             )
+            .Distinct()
             .ToList();
+    }
+
+    // The branch, when this failure sits directly on one of the branch's own members.
+    private static string? Branch(EvaluationResults failure) =>
+        Regex.Match(failure.EvaluationPath.ToString(), @"^(.*/anyOf/\d+)/properties/[^/]+$")
+            is { Success: true } m
+            ? m.Groups[1].Value
+            : null;
 
     private static Task<object?> InvokeHandlerAsync(RpcCallContext context) =>
         InvokeAsync(context.Method, context.Target, context.Arguments);

@@ -150,6 +150,23 @@ internal sealed class ProbeTagConverter : JsonConverter<ProbeTag>, IRpcSchemaPro
 
 internal sealed record ProbeFilterParams(string? NameFilter = null);
 
+// A discriminated union whose branches refuse unknown members, the shape of a dashboard widget.
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(ProbeCircle), "circle")]
+[JsonDerivedType(typeof(ProbeSquare), "square")]
+internal abstract record ProbeShape;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+internal sealed record ProbeCircle(ProbeSize Size) : ProbeShape;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+internal sealed record ProbeSquare(ProbeSize Size, string Label) : ProbeShape;
+
+[JsonUnmappedMemberHandling(JsonUnmappedMemberHandling.Disallow)]
+internal sealed record ProbeSize(int Value);
+
+internal sealed record ProbeShapesParams(IReadOnlyList<ProbeShape> Shapes);
+
 internal sealed record ProbeFilterResult(string? NameFilter);
 
 // Scanned out of this assembly by the dispatcher. AllowUnauthenticated keeps the host free of an
@@ -165,6 +182,9 @@ internal sealed class ProbeTarget
         AllowUnauthenticated = true
     )]
     public ProbeFilterResult Filter(ProbeFilterParams request) => new(request.NameFilter);
+
+    [RpcMethod("probe.v1.shapes", Summary = "Count the shapes.", AllowUnauthenticated = true)]
+    public int Shapes(ProbeShapesParams request) => request.Shapes.Count;
 
     [RpcMethod("probe.v1.tag", Summary = "Echo the tag it was given.", AllowUnauthenticated = true)]
     public string Tag(ProbeTagParams request) => request.Tag.Name + (request.Parent?.Name ?? "");
