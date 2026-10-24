@@ -69,6 +69,14 @@ public sealed class DispatcherScenarios
     }
 
     [Fact]
+    public void A_member_the_serializer_ignores_is_left_out_of_the_schema()
+    {
+        var schema = RpcSchema.Generate(RpcTestHost.JsonOptions, typeof(ProbeHiddenResult));
+        Assert.True(schema["properties"]!.AsObject().ContainsKey("shown"));
+        Assert.False(schema["properties"]!.AsObject().ContainsKey("hidden"));
+    }
+
+    [Fact]
     public async Task Params_OmittedEntirely_BindTheirDefaults()
     {
         await using var host = await RpcTestHost.StartAsync();

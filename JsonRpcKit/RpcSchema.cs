@@ -40,13 +40,15 @@ public static class RpcSchema
         switch (typeInfo.Kind)
         {
             case JsonTypeInfoKind.Object when obj["properties"] is JsonObject properties:
+                // Properties also lists members the serializer ignores, which the exporter left out.
                 foreach (var property in typeInfo.Properties)
-                    properties[property.Name] = Describe(
-                        options,
-                        property.PropertyType,
-                        properties[property.Name],
-                        visiting
-                    );
+                    if (properties.ContainsKey(property.Name))
+                        properties[property.Name] = Describe(
+                            options,
+                            property.PropertyType,
+                            properties[property.Name],
+                            visiting
+                        );
                 break;
             case JsonTypeInfoKind.Enumerable when typeInfo.ElementType is { } element:
                 obj["items"] = Describe(options, element, obj["items"], visiting);

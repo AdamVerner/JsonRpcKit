@@ -124,6 +124,12 @@ internal sealed record ProbeTagParams(
 // pass the schema's pattern and still be refused by the converter.
 internal readonly record struct ProbeTag(string Name);
 
+internal sealed record ProbeHiddenResult(ProbeTag Shown)
+{
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? Hidden { get; init; }
+}
+
 internal sealed class ProbeTagConverter : JsonConverter<ProbeTag>, IRpcSchemaProvider
 {
     public JsonNode GetSchema() =>
