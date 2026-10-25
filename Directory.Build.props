@@ -12,7 +12,7 @@
 
   <!-- NuGet package metadata (applies to packable projects only) -->
   <PropertyGroup>
-    <Version>0.0.2</Version>
+    <Version>0.0.3</Version>
     <Authors>Adam Verner</Authors>
     <Copyright>Copyright © 2026 Adam Verner</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
