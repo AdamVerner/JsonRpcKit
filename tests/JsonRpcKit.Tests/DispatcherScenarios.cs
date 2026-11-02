@@ -1,3 +1,4 @@
+using System.Text.Json;
 using StreamJsonRpc;
 
 namespace JsonRpcKit.Tests;
@@ -127,6 +128,40 @@ public sealed class DispatcherScenarios
         );
         Assert.Equal(4000, ex.ErrorCode);
         Assert.Equal("Refused by middleware", ex.Message);
+    }
+
+    [Fact]
+    public async Task AnEscapedException_IsShapedByTheHost_AndReportedWithTheOutcome()
+    {
+        var outcomes = new List<RpcCallOutcome>();
+        await using var host = await RpcTestHost.StartAsync(configure: dispatcher =>
+        {
+            dispatcher.Use((ctx, next) => throw new InvalidOperationException("secret detail"));
+            dispatcher.ShapeUnhandledException = (method, ex) =>
+                new RpcException(
+                    "Internal error",
+                    (int)RpcErrorCode.InternalError,
+                    new { errorId = "abc123", method }
+                );
+            dispatcher.OnCallHandled = outcomes.Add;
+        });
+        await using var client = await RpcTestClient.ConnectAsync(host);
+
+        var ex = await Assert.ThrowsAsync<RemoteInvocationException>(() =>
+            client.InvokeAsync<object>("probe.v1.filter", new { })
+        );
+        Assert.Equal((int)RpcErrorCode.InternalError, ex.ErrorCode);
+        Assert.Equal("Internal error", ex.Message);
+
+        // The data sent is the data reported, so the host can record the same errorId it answered.
+        var outcome = Assert.Single(outcomes);
+        Assert.Equal(("probe.v1.filter", "exception"), (outcome.Method, outcome.Outcome));
+        Assert.Equal((int)RpcErrorCode.InternalError, outcome.ErrorCode);
+        Assert.Equal(
+            "abc123",
+            JsonSerializer.SerializeToElement(outcome.ErrorData).GetProperty("errorId").GetString()
+        );
+        Assert.IsType<InvalidOperationException>(outcome.Exception);
     }
 
     [Fact]

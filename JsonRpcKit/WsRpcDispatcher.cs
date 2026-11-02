@@ -191,13 +191,14 @@ public sealed class WsRpcDispatcher
         }
     }
 
+    /// <summary>Invoked after every handled message. Set before <see cref="StartListening"/>.</summary>
+    public Action<RpcCallOutcome>? OnCallHandled { get; set; }
+
     /// <summary>
-    /// Invoked after every handled message with the resolved method name (or
-    /// <c>"unknown"</c> if no registered method matched), elapsed handling time, and a
-    /// terminal outcome (<c>"success"</c>, <c>"error"</c>, <c>"exception"</c>,
-    /// <c>"unauthorized"</c>, or <c>"not_found"</c>). Set before <see cref="StartListening"/>.
+    /// Turns an exception a handler let escape into the error the client receives. Without it the
+    /// client gets <see cref="RpcErrorCode.InternalError"/> with the exception's message.
     /// </summary>
-    public Action<string, TimeSpan, string>? OnCallHandled { get; set; }
+    public Func<string, Exception, RpcException>? ShapeUnhandledException { get; set; }
 
     /// <summary>
     /// Invoked when an inbound message exceeds <see cref="WsRpcDispatcherOptions.MaxMessageBytes"/>.
@@ -506,7 +507,7 @@ public sealed class WsRpcDispatcher
                         $"Method not found: {method}"
                     );
                 // Client-supplied method name is unbounded — don't let it become a label value.
-                OnCallHandled?.Invoke("unknown", sw.Elapsed, "not_found");
+                OnCallHandled?.Invoke(new RpcCallOutcome("unknown", sw.Elapsed, "not_found"));
                 return;
             }
 
@@ -519,7 +520,7 @@ public sealed class WsRpcDispatcher
                         (int)RpcErrorCode.NotAuthenticated,
                         "Not authenticated"
                     );
-                OnCallHandled?.Invoke(method, sw.Elapsed, "unauthorized");
+                OnCallHandled?.Invoke(new RpcCallOutcome(method, sw.Elapsed, "unauthorized"));
                 return;
             }
 
@@ -581,19 +582,39 @@ public sealed class WsRpcDispatcher
 
             if (haveId)
                 await SendResultAsync(idElement, resultValue);
-            OnCallHandled?.Invoke(method, sw.Elapsed, "success");
+            OnCallHandled?.Invoke(new RpcCallOutcome(method, sw.Elapsed, "success"));
         }
         catch (RpcException ex)
         {
             if (haveId)
                 await SendErrorAsync(idElement, ex.ErrorCode, ex.Message, ex.ErrorData);
-            OnCallHandled?.Invoke(method ?? "unknown", sw.Elapsed, "error");
+            OnCallHandled?.Invoke(
+                new RpcCallOutcome(
+                    method ?? "unknown",
+                    sw.Elapsed,
+                    "error",
+                    ex.ErrorCode,
+                    ex.ErrorData
+                )
+            );
         }
         catch (Exception ex)
         {
+            var shaped =
+                ShapeUnhandledException?.Invoke(method ?? "unknown", ex)
+                ?? new RpcException(ex.Message, (int)RpcErrorCode.InternalError);
             if (haveId)
-                await SendErrorAsync(idElement, (int)RpcErrorCode.InternalError, ex.Message);
-            OnCallHandled?.Invoke(method ?? "unknown", sw.Elapsed, "exception");
+                await SendErrorAsync(idElement, shaped.ErrorCode, shaped.Message, shaped.ErrorData);
+            OnCallHandled?.Invoke(
+                new RpcCallOutcome(
+                    method ?? "unknown",
+                    sw.Elapsed,
+                    "exception",
+                    shaped.ErrorCode,
+                    shaped.ErrorData,
+                    ex
+                )
+            );
         }
     }
 
