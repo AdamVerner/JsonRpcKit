@@ -762,6 +762,23 @@
         )}${body}</div>`;
       }
 
+      function errorsBlock(errors) {
+        if (!errors || !errors.length) return '';
+        const rows = errors
+          .map(
+            (error) => `<tr>
+              <td class="type">${escapeHtml(error.code)}</td>
+              <td class="desc">${escapeHtml(error.message || '')}${
+                error.data === undefined
+                  ? ''
+                  : ` <code>${escapeHtml(JSON.stringify(error.data))}</code>`
+              }</td>
+            </tr>`,
+          )
+          .join('');
+        return `<div class="field"><span class="eyebrow">Errors</span><table><colgroup><col class="c-code" /><col /></colgroup><thead><tr><th>Code</th><th>Means</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      }
+
       // The whole warning travels in the document as data, so the page lays it out rather than
       // parsing a markdown banner out of a description.
       // Grouping ignores `note`: the note is the one part that is meant to differ per method, so
@@ -847,6 +864,7 @@
             ${paramsTable(method.params, isNotification ? 'payload' : 'params')}
           </div>
           ${isNotification ? '' : resultBlock(method.result)}
+          ${errorsBlock(method.errors)}
           <details>
             <summary>OpenRPC entry</summary>
             <pre>${escapeHtml(JSON.stringify(method, null, 2))}</pre>

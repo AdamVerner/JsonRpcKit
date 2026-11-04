@@ -30,6 +30,9 @@ public sealed class RpcMethodAttribute(string name) : Attribute
     /// </summary>
     public required string Summary { get; init; }
 
+    /// <summary>Markdown published as the OpenRPC method's <c>description</c>.</summary>
+    public string? Description { get; init; }
+
     /// <summary>
     /// When <see langword="true"/>, the method may be called before the connection has
     /// been authenticated. Defaults to <see langword="false"/>; unauthenticated calls

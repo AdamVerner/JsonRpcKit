@@ -199,6 +199,18 @@ A method's category is the first segment of its name — `org.v1.list` is an `or
 `[RpcMethod(Tag = "…")]` says otherwise. `options.Tag(...)` gives a category its heading and prose;
 an undescribed category still lists its methods, just without either.
 
+A method's `description` is `[RpcMethod(Description = "…")]`, in markdown. Its `errors` list is one
+`[RpcError(code, message)]` per error, in declaration order. `RpcErrorAttribute` is unsealed: a
+subclass can map an application's own vocabulary to code and message and override `Data`, which is
+published as the error's `data` through `SerializerOptions`. Errors shared by the whole API go in
+`options.Error(...)` and land in `components/errors`.
+
+```csharp
+[RpcMethod("org.v1.get", Summary = "Get one organization by id.", Description = "Hidden ones are *not found*.")]
+[RpcError(1001, "No such organization, or none visible.")]
+public Task<OrgInfo> GetAsync(GetParams p) => ...;
+```
+
 The document conforms to OpenRPC 1.3.2. Three things the specification has no field for travel as
 extensions: category order (`x-tag-order`), a category's display name (`x-displayName`), and
 server-to-client messages (`x-notifications`). `options.Customize` hands you the finished document

@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -164,12 +165,30 @@ public static class OpenRpcDocumentBuilder
             UnwrapAsyncResultType(entry.Method.ReturnType)
         );
 
+        if (entry.Attribute.Description is { Length: > 0 } description)
+            method["description"] = description;
+
+        var errors = entry
+            .Method.GetCustomAttributes<RpcErrorAttribute>(inherit: true)
+            .Select(error => BuildError(options, error))
+            .ToJsonArray();
+        if (errors.Count > 0)
+            method["errors"] = errors;
+
         if (tag is not null)
             // A Reference Object may carry nothing but $ref, so the catalogue entry is the only
             // place a category's prose lives.
             method["tags"] = new JsonArray(new JsonObject { ["$ref"] = TagRefPrefix + tag });
 
         return method;
+    }
+
+    private static JsonObject BuildError(JsonSerializerOptions options, RpcErrorAttribute error)
+    {
+        var node = new JsonObject { ["code"] = error.Code, ["message"] = error.Message };
+        if (error.Data is { } data)
+            node["data"] = JsonSerializer.SerializeToNode(data, data.GetType(), options);
+        return node;
     }
 
     private static JsonObject BuildNotification(
